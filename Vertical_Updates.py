@@ -154,11 +154,9 @@ def main():
 
             # --- APPLY COMMENTS VÀ REMOVE PERIOD ---
             for df in [df_cor, df_rev]:
-                # Xóa cột Period như hình mẫu
                 if 'Period' in df.columns:
                     df.drop(columns=['Period'], inplace=True)
                 
-                # Cập nhật cột Comments nếu user có nhập
                 if user_comment:
                     if 'Comments' in df.columns:
                         df['Comments'] = user_comment
@@ -167,24 +165,31 @@ def main():
                     else:
                         df['Comments'] = user_comment
                 
-                # Xóa các cột tạm xử lý
                 df.drop(columns=['SortKey', 'Original Invoice'], errors='ignore', inplace=True)
 
             # =======================================================
             # CONSOLIDATE (GỘP) COR VÀ REV THÀNH 1 SHEET UPLOAD
             # =======================================================
             df_upload = pd.concat([df_cor, df_rev], ignore_index=True)
+            
+            # =======================================================
+            # FORMAT CỘT THÀNH NUMBER (Không thập phân, không dấu phẩy)
+            # =======================================================
+            format_cols = ['Source Business Unit ID', 'Business Unit ID']
+            for col in format_cols:
+                if col in df_upload.columns:
+                    # Chuyển kiểu dữ liệu thành Int64 (kiểu số nguyên của Pandas có hỗ trợ giá trị rỗng).
+                    # Quá trình này sẽ cắt bỏ phần đuôi .0 hoặc định dạng khoa học ở các dãy số cực dài.
+                    df_upload[col] = pd.to_numeric(df_upload[col], errors='coerce').astype('Int64')
 
             progress_bar.progress(80)
             status_text.text("Đang nén dữ liệu để tải xuống...")
 
             # --- CHUẨN BỊ XUẤT FILE ĐẦU RA ---
-            # EXCEL OUTPUT - Lưu vào duy nhất sheet "Upload"
             excel_buffer = io.BytesIO()
             with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
                 df_upload.to_excel(writer, sheet_name='Upload', index=False)
             
-            # CSV OUTPUT
             csv_buffer = df_upload.to_csv(index=False).encode('utf-8-sig')
 
             # Lưu vào bộ nhớ Session State để giữ nút Download
@@ -200,7 +205,7 @@ def main():
             progress_bar.empty()
             st.session_state.processed = False
 
-    # --- HIỂN THỊ NÚT DOWNLOAD (Sử dụng state để không bị biến mất) ---
+    # --- HIỂN THỊ NÚT DOWNLOAD ---
     if st.session_state.processed:
         col_btn1, col_btn2 = st.columns(2)
         with col_btn1:
