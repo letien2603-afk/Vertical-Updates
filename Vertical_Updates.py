@@ -52,9 +52,9 @@ def main():
     # 1. & 2. Upload file
     col1, col2 = st.columns(2)
     with col1:
-        req_file = st.file_uploader("1. Upload Requested Correction file (.xlsx)", type=['xlsx', 'xls'])
+        req_file = st.file_uploader("1. Upload Requested Correction file", type=['xlsx', 'xls', 'xlsb'])
     with col2:
-        atf_file = st.file_uploader("2. Upload ATF file (.xlsx)", type=['xlsx', 'xls'])
+        atf_file = st.file_uploader("2. Upload ATF file", type=['xlsx', 'xls', 'xlsb'])
         
     # 3. Input Comment
     user_comment = st.text_input("3. Nhập Comment (Sẽ áp dụng cho toàn bộ sheet COR và REV):")
@@ -71,8 +71,16 @@ def main():
 
         try:
             status_text.text("Đang đọc dữ liệu từ file Excel...")
-            df_req = pd.read_excel(req_file, sheet_name=0)
-            df_atf = pd.read_excel(atf_file, sheet_name=0)
+            # Hàm phụ trợ để tự động chọn engine cho xlsb
+            def load_excel(file_upload):
+                if file_upload.name.endswith('.xlsb'):
+                    return pd.read_excel(file_upload, sheet_name=0, engine='pyxlsb')
+                else:
+                    return pd.read_excel(file_upload, sheet_name=0)
+
+            df_req = load_excel(req_file)
+            df_atf = load_excel(atf_file)
+            
             progress_bar.progress(20)
 
             # --- XỬ LÝ REQUESTED CORRECTION ---
