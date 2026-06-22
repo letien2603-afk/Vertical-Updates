@@ -46,7 +46,7 @@ def replace_cor_with_rev(val):
 
 def main():
     st.set_page_config(page_title="Invoice Correction Tool", layout="wide")
-    st.title("Chương Trình Xử Lý Invoice & ATF")
+    st.title("Vertical Bulk Corrections")
     
     # Khởi tạo session state để giữ các nút download không bị biến mất
     if 'processed' not in st.session_state:
@@ -61,11 +61,11 @@ def main():
     with col2:
         atf_file = st.file_uploader("2. Upload ATF file", type=['xlsx', 'xls', 'xlsb'])
         
-    user_comment = st.text_input("3. Nhập Comment (Sẽ áp dụng cho toàn bộ dữ liệu):")
+    user_comment = st.text_input("3. Comment")
 
-    if st.button("Bắt đầu xử lý dữ liệu"):
+    if st.button("Start Data Processing"):
         if not req_file or not atf_file:
-            st.error("Lỗi: Vui lòng upload đầy đủ 2 file!")
+            st.error("Error: Need to upload 2 requested files!")
             return
             
         progress_bar = st.progress(0)
@@ -79,13 +79,13 @@ def main():
                 else:
                     return pd.read_excel(file_upload, sheet_name=0)
 
-            status_text.text("Đang đọc dữ liệu từ file Excel...")
+            status_text.text("Scanning the uploaded files...")
             df_req = load_excel(req_file)
             df_atf = load_excel(atf_file)
             progress_bar.progress(20)
 
             # --- XỬ LÝ REQUESTED CORRECTION ---
-            status_text.text("Đang xử lý Requested Correction file...")
+            status_text.text("Scanning Requested Correction file...")
             df_req['Text'] = df_req['Invoice Number'].apply(lambda x: isinstance(x, str))
 
             def format_invoice(row):
@@ -106,7 +106,7 @@ def main():
             progress_bar.progress(40)
 
             # --- XỬ LÝ ATF FILE & MATCHING ---
-            status_text.text("Đang xử lý ATF file và matching invoices...")
+            status_text.text("Processing ATF file and matching invoices...")
             df_atf['Original Invoice'] = df_atf['Invoice Number'].apply(clean_original_invoice)
             matched_atf = df_atf[df_atf['Original Invoice'].isin(original_invoices_memory)].copy()
 
@@ -124,7 +124,7 @@ def main():
                 latest_atf.drop(columns=['Req_Vertical'], inplace=True)
                 
             if latest_atf.empty:
-                st.warning("Tất cả Invoice đều đã khớp Vertical hoặc không có dữ liệu để update.")
+                st.warning("Verticals in all requested invoices have been updated to match with the requested file or no matching invoices to process.")
                 progress_bar.progress(100)
                 st.session_state.processed = False
                 return
@@ -132,7 +132,7 @@ def main():
             progress_bar.progress(60)
 
             # --- TẠO DỮ LIỆU COR VÀ REV ---
-            status_text.text("Đang tạo dữ liệu COR/REV và cập nhật Comment/Period...")
+            status_text.text("Updating invoices suffix and Comments...")
             df_cor = latest_atf.copy()
             df_rev = latest_atf.copy()
 
@@ -183,7 +183,7 @@ def main():
                     df_upload[col] = pd.to_numeric(df_upload[col], errors='coerce').astype('Int64')
 
             progress_bar.progress(80)
-            status_text.text("Đang nén dữ liệu để tải xuống...")
+            status_text.text("Creating the output files...")
 
             # --- CHUẨN BỊ XUẤT FILE ĐẦU RA ---
             excel_buffer = io.BytesIO()
@@ -198,10 +198,10 @@ def main():
             st.session_state.processed = True
 
             progress_bar.progress(100)
-            status_text.success("Hoàn tất xử lý! Vui lòng tải các file kết quả bên dưới.")
+            status_text.success("Completed data processing. Files are ready to download")
 
         except Exception as e:
-            st.error(f"Đã xảy ra lỗi trong quá trình xử lý: {e}")
+            st.error(f"Error: data processing error: {e}")
             progress_bar.empty()
             st.session_state.processed = False
 
@@ -210,16 +210,16 @@ def main():
         col_btn1, col_btn2 = st.columns(2)
         with col_btn1:
             st.download_button(
-                label="📥 Tải xuống File Excel (.xlsx)",
+                label="📥 Download Excel (.xlsx)",
                 data=st.session_state.excel_data,
-                file_name="Matched_Latest_Invoices_Upload.xlsx",
+                file_name="Vertical Bulk Corrections.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
         with col_btn2:
             st.download_button(
-                label="📥 Tải xuống File CSV (.csv)",
+                label="📥 Download CSV (.csv)",
                 data=st.session_state.csv_data,
-                file_name="Matched_Latest_Invoices_Upload.csv",
+                file_name="Vertical Bulk Corrections.csv",
                 mime="text/csv"
             )
 
