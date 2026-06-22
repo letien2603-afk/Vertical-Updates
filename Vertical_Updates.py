@@ -39,7 +39,7 @@ def increment_or_append_suffix(val, suffix_type):
         return f"{val.strip()}-{suffix_type}"
 
 def replace_cor_with_rev(val):
-    """Thay thế chữ COR thành REV để sheet REV đồng bộ cấp độ với sheet COR"""
+    """Thay thế chữ COR thành REV để đồng bộ cấp độ"""
     if pd.isnull(val): return val
     val = str(val)
     return re.sub(r'COR(\d*)$', r'REV\1', val)
@@ -48,39 +48,40 @@ def main():
     st.set_page_config(page_title="Invoice Correction Tool", layout="wide")
     st.title("Chương Trình Xử Lý Invoice & ATF")
     
+    # Khởi tạo session state để giữ các nút download không bị biến mất
+    if 'processed' not in st.session_state:
+        st.session_state.processed = False
+        st.session_state.excel_data = None
+        st.session_state.csv_data = None
+
     # --- UI GIAO DIỆN STREAMLIT ---
-    # 1. & 2. Upload file
     col1, col2 = st.columns(2)
     with col1:
         req_file = st.file_uploader("1. Upload Requested Correction file", type=['xlsx', 'xls', 'xlsb'])
     with col2:
         atf_file = st.file_uploader("2. Upload ATF file", type=['xlsx', 'xls', 'xlsb'])
         
-    # 3. Input Comment
-    user_comment = st.text_input("3. Nhập Comment (Sẽ áp dụng cho toàn bộ sheet COR và REV):")
+    user_comment = st.text_input("3. Nhập Comment (Sẽ áp dụng cho toàn bộ dữ liệu):")
 
-    # Nút thực thi
     if st.button("Bắt đầu xử lý dữ liệu"):
         if not req_file or not atf_file:
             st.error("Lỗi: Vui lòng upload đầy đủ 2 file!")
             return
             
-        # 5. Thanh tiến trình (Progress bar)
         progress_bar = st.progress(0)
         status_text = st.empty()
 
         try:
-            status_text.text("Đang đọc dữ liệu từ file Excel...")
-            # Hàm phụ trợ để tự động chọn engine cho xlsb
+            # Hàm phụ trợ để xử lý cho cả định dạng xlsx, xls và xlsb
             def load_excel(file_upload):
                 if file_upload.name.endswith('.xlsb'):
                     return pd.read_excel(file_upload, sheet_name=0, engine='pyxlsb')
                 else:
                     return pd.read_excel(file_upload, sheet_name=0)
 
+            status_text.text("Đang đọc dữ liệu từ file Excel...")
             df_req = load_excel(req_file)
             df_atf = load_excel(atf_file)
-            
             progress_bar.progress(20)
 
             # --- XỬ LÝ REQUESTED CORRECTION ---
@@ -113,6 +114,7 @@ def main():
             max_sort_keys = matched_atf.groupby('Original Invoice')['SortKey'].transform('max')
             latest_atf = matched_atf[matched_atf['SortKey'] == max_sort_keys].copy()
 
+            # Skip Vertical
             col_vertical_atf = 'Vertical'
             if col_vertical_atf in latest_atf.columns:
                 latest_atf['Req_Vertical'] = latest_atf['Original Invoice'].map(vertical_mapping)
@@ -124,22 +126,23 @@ def main():
             if latest_atf.empty:
                 st.warning("Tất cả Invoice đều đã khớp Vertical hoặc không có dữ liệu để update.")
                 progress_bar.progress(100)
+                st.session_state.processed = False
                 return
 
             progress_bar.progress(60)
 
-            # --- TẠO SHEETS COR VÀ REV ---
-            status_text.text("Đang tạo sheet COR/REV và cập nhật Comment/Period...")
+            # --- TẠO DỮ LIỆU COR VÀ REV ---
+            status_text.text("Đang tạo dữ liệu COR/REV và cập nhật Comment/Period...")
             df_cor = latest_atf.copy()
             df_rev = latest_atf.copy()
 
-            # Sheet COR
+            # Xử lý COR
             df_cor['Transaction Number'] = df_cor['Transaction Number'].apply(lambda x: increment_or_append_suffix(x, 'COR'))
             df_cor['Invoice Number'] = df_cor['Invoice Number'].apply(lambda x: increment_or_append_suffix(x, 'COR'))
             df_cor['Transaction Type'] = 'MANUAL_ADJ'
             df_cor['Vertical'] = df_cor['Original Invoice'].map(vertical_mapping)
 
-            # Sheet REV
+            # Xử lý REV
             df_rev['Transaction Number'] = df_cor['Transaction Number'].apply(replace_cor_with_rev)
             df_rev['Invoice Number'] = df_cor['Invoice Number'].apply(replace_cor_with_rev)
             df_rev['Transaction Type'] = 'MANUAL_ADJ'
@@ -151,62 +154,69 @@ def main():
 
             # --- APPLY COMMENTS VÀ REMOVE PERIOD ---
             for df in [df_cor, df_rev]:
-                # Xóa cột Period
+                # Xóa cột Period như hình mẫu
                 if 'Period' in df.columns:
                     df.drop(columns=['Period'], inplace=True)
                 
                 # Cập nhật cột Comments nếu user có nhập
                 if user_comment:
-                    # Hỗ trợ cả 'Comment' và 'Comments' tùy thuộc file nguồn
                     if 'Comments' in df.columns:
                         df['Comments'] = user_comment
                     elif 'Comment' in df.columns:
                         df['Comment'] = user_comment
                     else:
-                        # Nếu file gốc không có cột này, tự động tạo mới
                         df['Comments'] = user_comment
                 
-                # Xóa các cột tạm xử lý thuật toán
+                # Xóa các cột tạm xử lý
                 df.drop(columns=['SortKey', 'Original Invoice'], errors='ignore', inplace=True)
+
+            # =======================================================
+            # CONSOLIDATE (GỘP) COR VÀ REV THÀNH 1 SHEET UPLOAD
+            # =======================================================
+            df_upload = pd.concat([df_cor, df_rev], ignore_index=True)
 
             progress_bar.progress(80)
             status_text.text("Đang nén dữ liệu để tải xuống...")
 
             # --- CHUẨN BỊ XUẤT FILE ĐẦU RA ---
-            # EXCEL OUTPUT
+            # EXCEL OUTPUT - Lưu vào duy nhất sheet "Upload"
             excel_buffer = io.BytesIO()
             with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-                df_cor.to_excel(writer, sheet_name='COR', index=False)
-                df_rev.to_excel(writer, sheet_name='REV', index=False)
+                df_upload.to_excel(writer, sheet_name='Upload', index=False)
             
-            # 4. CSV OUTPUT
-            # Gộp dữ liệu 2 bản COR và REV lại chung 1 file CSV. Cột "Sheet_Type" sẽ được gắn tự động để phân biệt.
-            df_csv = pd.concat([df_cor.assign(Sheet_Type='COR'), df_rev.assign(Sheet_Type='REV')], ignore_index=True)
-            csv_buffer = df_csv.to_csv(index=False).encode('utf-8-sig') # Dùng utf-8-sig để giữ nguyên font trên Excel
+            # CSV OUTPUT
+            csv_buffer = df_upload.to_csv(index=False).encode('utf-8-sig')
+
+            # Lưu vào bộ nhớ Session State để giữ nút Download
+            st.session_state.excel_data = excel_buffer.getvalue()
+            st.session_state.csv_data = csv_buffer
+            st.session_state.processed = True
 
             progress_bar.progress(100)
             status_text.success("Hoàn tất xử lý! Vui lòng tải các file kết quả bên dưới.")
 
-            # Hiển thị nút Tải Xuống
-            col_btn1, col_btn2 = st.columns(2)
-            with col_btn1:
-                st.download_button(
-                    label="📥 Tải xuống File Excel (.xlsx)",
-                    data=excel_buffer.getvalue(),
-                    file_name="Matched_Latest_Invoices.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-            with col_btn2:
-                st.download_button(
-                    label="📥 Tải xuống File CSV (.csv)",
-                    data=csv_buffer,
-                    file_name="Matched_Latest_Invoices.csv",
-                    mime="text/csv"
-                )
-
         except Exception as e:
             st.error(f"Đã xảy ra lỗi trong quá trình xử lý: {e}")
             progress_bar.empty()
+            st.session_state.processed = False
+
+    # --- HIỂN THỊ NÚT DOWNLOAD (Sử dụng state để không bị biến mất) ---
+    if st.session_state.processed:
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            st.download_button(
+                label="📥 Tải xuống File Excel (.xlsx)",
+                data=st.session_state.excel_data,
+                file_name="Matched_Latest_Invoices_Upload.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        with col_btn2:
+            st.download_button(
+                label="📥 Tải xuống File CSV (.csv)",
+                data=st.session_state.csv_data,
+                file_name="Matched_Latest_Invoices_Upload.csv",
+                mime="text/csv"
+            )
 
 if __name__ == "__main__":
     main()
