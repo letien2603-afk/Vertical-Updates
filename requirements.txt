@@ -1,3 +1,7 @@
 pandas
 re
 io
+streamlit
+pandas
+openpyxl
+pyxlsb
