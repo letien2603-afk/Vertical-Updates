@@ -115,7 +115,7 @@ def main():
             status_text.text("Processing ATF file and matching invoices...")
             df_atf['Original Invoice'] = df_atf['Invoice Number'].apply(clean_original_invoice)
             matched_atf = df_atf[df_atf['Original Invoice'].isin(original_invoices_memory)].copy()
-			
+
 			matched_atf['SortKey'] = matched_atf['Invoice Number'].apply(parse_suffix_for_ranking)
 			matched_atf['Temp_Amount'] = pd.to_numeric(matched_atf['Transaction Amount'], errors='coerce').abs()
 			max_sort_keys = matched_atf.groupby(['Original Invoice', 'Temp_Amount'], dropna=False)['SortKey'].transform('max')
