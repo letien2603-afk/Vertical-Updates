@@ -122,6 +122,7 @@ def main():
 			max_sort_keys = matched_atf.groupby(['Original Invoice', 'Temp_Amount'], dropna=False)['SortKey'].transform('max')
 			matched_atf.drop(columns=['Temp_Amount'], inplace=True)
 			latest_atf = matched_atf[matched_atf['SortKey'] == max_sort_keys].copy()
+			
 
             # Skip Vertical
             col_vertical_atf = 'Vertical'
