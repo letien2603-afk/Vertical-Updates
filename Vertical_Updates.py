@@ -30,7 +30,6 @@ def parse_suffix_for_ranking(inv):
     
     return (num_val, type_val, dash_count)
 
-
 def increment_or_append_suffix(val, suffix_type): 
     """Tính toán cấp độ (level) của hoá đơn và gắn hậu tố mới""" 
     if pd.isnull(val): return val 
@@ -117,11 +116,16 @@ def main():
             df_atf['Original Invoice'] = df_atf['Invoice Number'].apply(clean_original_invoice)
             matched_atf = df_atf[df_atf['Original Invoice'].isin(original_invoices_memory)].copy()
 
-            matched_atf['SortKey'] = matched_atf['Invoice Number'].apply(parse_suffix_for_ranking)
+            #matched_atf['SortKey'] = matched_atf['Invoice Number'].apply(parse_suffix_for_ranking)
+            #max_sort_keys = matched_atf.groupby('Original Invoice')['SortKey'].transform('max')
+            #latest_atf = matched_atf[matched_atf['SortKey'] == max_sort_keys].copy()
+			
+			matched_atf['SortKey'] = matched_atf['Invoice Number'].apply(parse_suffix_for_ranking)
 			matched_atf['Temp_Amount'] = pd.to_numeric(matched_atf['Transaction Amount'], errors='coerce').abs()
 			max_sort_keys = matched_atf.groupby(['Original Invoice', 'Temp_Amount'], dropna=False)['SortKey'].transform('max')
 			matched_atf.drop(columns=['Temp_Amount'], inplace=True)
 			latest_atf = matched_atf[matched_atf['SortKey'] == max_sort_keys].copy()
+			
 			
 
             # Skip Vertical
