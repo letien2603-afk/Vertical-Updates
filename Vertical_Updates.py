@@ -147,7 +147,7 @@ def main():
             df_rev['Invoice Number'] = df_cor['Invoice Number'].apply(replace_cor_with_rev)
             df_rev['Transaction Type'] = 'MANUAL_ADJ'
 
-            cols_to_invert = ['Transaction Amount', 'EUR Value', 'CAD Value', 'GBP Value']
+            cols_to_invert = ['Transaction Amount', 'EUR Value', 'CAD Value', 'GBP Value','Native Currency','AUD Value']
             for col in cols_to_invert:
                 if col in df_rev.columns:
                     df_rev[col] = pd.to_numeric(df_rev[col], errors='coerce') * -1
