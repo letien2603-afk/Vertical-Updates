@@ -3,44 +3,51 @@ import pandas as pd
 import re
 import io
 
-def clean_original_invoice(inv):
-    """Xoá bỏ các phần COR, REV và các số theo sau để lấy Original Invoice"""
-    if pd.isnull(inv):
-        return ""
-    inv = str(inv)
-    pattern = re.compile(r'\s*-?\s*(COR|REV)\d*$', re.IGNORECASE)
-    return re.sub(pattern, '', inv).strip()
+def clean_original_invoice(inv): 
+    """Xoá bỏ các phần COR, REV và các số theo sau để lấy Original Invoice""" 
+    if pd.isnull(inv): 
+        return "" 
+    inv = str(inv).strip()
+    # Dùng [\s\-]* để quét MỌI dấu gạch ngang (bao gồm --COR)
+    pattern = re.compile(r'[\s\-]*(COR|REV)\d*$', re.IGNORECASE) 
+    cleaned = re.sub(pattern, '', inv).strip()
+    return cleaned.rstrip('- ')
 
-def parse_suffix_for_ranking(inv):
-    """Phân loại để tìm ra Invoice mới nhất"""
-    inv = str(inv).upper()
-    match = re.search(r'\s*-?\s*(COR|REV)(\d*)$', inv)
-    if not match:
-        return (0, 0)
+def parse_suffix_for_ranking(inv): 
+    """Phân loại để tìm ra Invoice mới nhất theo 3 cấp độ""" 
+    inv = str(inv).upper().strip()
+    match = re.search(r'([\s\-]*)(COR|REV)(\d*)$', inv) 
+    if not match: 
+        return (0, 0, 0)
     
-    type_str = match.group(1)
-    num_str = match.group(2)
+    separator = match.group(1)
+    type_str = match.group(2)
+    num_str = match.group(3)
+    
     type_val = 2 if type_str == 'COR' else 1
     num_val = int(num_str) if num_str else 1
-    return (num_val, type_val)
+    dash_count = separator.count('-') # Đếm số lượng gạch ngang để ưu tiên --COR hơn -COR
+    
+    return (num_val, type_val, dash_count)
 
-def increment_or_append_suffix(val, suffix_type):
-    """Tính toán cấp độ (level) của hoá đơn và gắn hậu tố mới"""
-    if pd.isnull(val): return val
-    val = str(val)
-    match = re.search(r'(?i)(.*?)(?:-?\s*)(COR|REV)(\d*)$', val)
-    if match:
-        prefix = match.group(1).strip()
+
+def increment_or_append_suffix(val, suffix_type): 
+    """Tính toán cấp độ (level) của hoá đơn và gắn hậu tố mới""" 
+    if pd.isnull(val): return val 
+    val = str(val).strip()
+    match = re.search(r'(?i)(.*?)(?:[\s\-]*)(COR|REV)(\d*)$', val) 
+    if match: 
+        prefix = match.group(1).rstrip('- ') 
         num_str = match.group(3)
         current_num = int(num_str) if num_str else 1
         next_num = current_num + 1
         return f"{prefix}-{suffix_type}{next_num}"
     else:
-        return f"{val.strip()}-{suffix_type}"
+        return f"{val.rstrip('- ')}-{suffix_type}"
 
-def replace_cor_with_rev(val):
-    """Thay thế chữ COR thành REV để đồng bộ cấp độ"""
-    if pd.isnull(val): return val
+def replace_cor_with_rev(val): 
+    """Thay thế chữ COR thành REV để đồng bộ cấp độ""" 
+    if pd.isnull(val): return val 
     val = str(val)
     return re.sub(r'COR(\d*)$', r'REV\1', val)
 
@@ -111,8 +118,10 @@ def main():
             matched_atf = df_atf[df_atf['Original Invoice'].isin(original_invoices_memory)].copy()
 
             matched_atf['SortKey'] = matched_atf['Invoice Number'].apply(parse_suffix_for_ranking)
-            max_sort_keys = matched_atf.groupby('Original Invoice')['SortKey'].transform('max')
-            latest_atf = matched_atf[matched_atf['SortKey'] == max_sort_keys].copy()
+			matched_atf['Temp_Amount'] = pd.to_numeric(matched_atf['Transaction Amount'], errors='coerce').abs()
+			max_sort_keys = matched_atf.groupby(['Original Invoice', 'Temp_Amount'], dropna=False)['SortKey'].transform('max')
+			matched_atf.drop(columns=['Temp_Amount'], inplace=True)
+			latest_atf = matched_atf[matched_atf['SortKey'] == max_sort_keys].copy()
 
             # Skip Vertical
             col_vertical_atf = 'Vertical'
