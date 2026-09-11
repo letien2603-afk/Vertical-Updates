@@ -104,8 +104,8 @@ def main():
             df_req['Original Invoice'] = df_req['Invoice Number'].apply(clean_original_invoice)
             original_invoices_memory = df_req['Original Invoice'].drop_duplicates().tolist()
 
-            if 'CONFIRMED VERTICAL' in df_req.columns:
-                vertical_mapping = dict(zip(df_req['Original Invoice'], df_req['CONFIRMED VERTICAL']))
+            if 'Corrected Vertical' in df_req.columns:
+                vertical_mapping = dict(zip(df_req['Original Invoice'], df_req['Corrected Vertical']))
             else:
                 vertical_mapping = {}
 
