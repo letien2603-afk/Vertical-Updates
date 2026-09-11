@@ -53,6 +53,7 @@ def replace_cor_with_rev(val):
 def main():
     st.set_page_config(page_title="Invoice Correction Tool", layout="wide")
     st.title("Vertical Bulk Corrections")
+    st.title("***Note: check the reference file from Ops team to confirm if it has either CONFIRMED VERTICAL or Corrected Vertical")
     
     # Khởi tạo session state để giữ các nút download không bị biến mất
     if 'processed' not in st.session_state:
