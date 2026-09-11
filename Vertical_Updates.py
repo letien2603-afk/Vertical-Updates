@@ -106,8 +106,7 @@ def main():
 
             if 'Corrected Vertical' in df_req.columns:
                 vertical_mapping = dict(zip(df_req['Original Invoice'], df_req['Corrected Vertical']))
-            else:
-            if 'CONFIRMED VERTICAL' in df_req.columns:
+            elif 'CONFIRMED VERTICAL' in df_req.columns:
                 vertical_mapping = dict(zip(df_req['Original Invoice'], df_req['Corrected Vertical']))
             else:
                 vertical_mapping = {}
