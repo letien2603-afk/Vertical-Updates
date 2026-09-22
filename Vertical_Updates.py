@@ -119,30 +119,13 @@ def main():
             df_atf['Original Invoice'] = df_atf['Invoice Number'].apply(clean_original_invoice)
             matched_atf = df_atf[df_atf['Original Invoice'].isin(original_invoices_memory)].copy()
 
-            # Safety check to prevent app crashes if zero matches are found
-            if matched_atf.empty:
-                st.warning("No matching invoices found between the ATF file and the requested invoices.")
-                progress_bar.progress(100)
-                st.session_state.processed = False
-                return
-
             matched_atf['SortKey'] = matched_atf['Invoice Number'].apply(parse_suffix_for_ranking)
+            matched_atf['Temp_Amount'] = pd.to_numeric(matched_atf['Transaction Amount'],errors='coerce')
             
-            # 1. Clean up and standardize the messy text floats into real numeric values
-            matched_atf['Transaction Amount'] = pd.to_numeric(
-                matched_atf['Transaction Amount'].astype(str).str.strip(), 
-                errors='coerce'
-            )
-            
-            # 2. Create a standardized rounding key so grouping does not fail on minor decimal discrepancies
-            matched_atf['Temp_Amount_Group'] = matched_atf['Transaction Amount'].round(2)
-
-            # 3. Group by the clean, rounded values
-            max_sort_keys = matched_atf.groupby(['Original Invoice', 'Temp_Amount_Group'], dropna=False)['SortKey'].transform('max')
-            
-            # 4. Filter data and safely drop the grouping helper column
+            #.round(2).abs()
+            max_sort_keys = matched_atf.groupby(['Original Invoice', 'Temp_Amount'], dropna=False)['SortKey'].transform('max')
+            matched_atf.drop(columns=['Temp_Amount'], inplace=True)
             latest_atf = matched_atf[matched_atf['SortKey'] == max_sort_keys].copy()
-            latest_atf.drop(columns=['Temp_Amount_Group'], errors='ignore', inplace=True)
 
             # Skip Vertical
             col_vertical_atf = 'Vertical'
@@ -151,7 +134,7 @@ def main():
                 val_atf = latest_atf[col_vertical_atf].astype(str).str.strip().str.lower()
                 val_req = latest_atf['Req_Vertical'].astype(str).str.strip().str.lower()
                 latest_atf = latest_atf[val_atf != val_req].copy()
-                latest_atf.drop(columns=['Req_Vertical'], errors='ignore', inplace=True)
+                latest_atf.drop(columns=['Req_Vertical'], inplace=True)
                 
             if latest_atf.empty:
                 st.warning("Verticals in all requested invoices have been updated to match with the requested file or no matching invoices to process.")
