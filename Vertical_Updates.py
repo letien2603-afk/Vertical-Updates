@@ -293,10 +293,6 @@ def main():
             f" COR + {len(df_rev)} REV)."
         )
 
-        # Preview Data
-        st.subheader("Preview Output Data")
-        st.dataframe(df_upload, use_container_width=True)
-
         # Prepare Downloads
         excel_buffer = io.BytesIO()
         with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
