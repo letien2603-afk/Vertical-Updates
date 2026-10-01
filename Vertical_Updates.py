@@ -306,8 +306,7 @@ def main():
                     st.session_state.processed_results = {
                         "df_upload": df_upload,
                         "excel_data": excel_data,
-                        "csv_data": csv_data,
-                        "msg": f"🎉 Success! Generated {len(df_upload)} records ({len(df_cor)} COR + {len(df_rev)} REV)."
+                        "csv_data": csv_data
                     }
 
                 except Exception as e:
