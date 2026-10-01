@@ -83,9 +83,7 @@ def load_file_data(uploaded_file):
     )
   else:
     try:
-      return pd.read_csv(
-          uploaded_file, sep=None, engine="python", dtype=str
-      )
+      return pd.read_csv(uploaded_file, sep=None, engine="python", dtype=str)
     except Exception:
       uploaded_file.seek(0)
       return pd.read_excel(
