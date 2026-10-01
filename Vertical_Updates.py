@@ -293,9 +293,6 @@ def main():
                     f" COR + {len(df_rev)} REV)."
                 )
 
-                # Preview Data
-                st.subheader("Preview Output Data")
-                st.dataframe(df_upload, use_container_width=True)
 
                 # Prepare Downloads
                 excel_buffer = io.BytesIO()
